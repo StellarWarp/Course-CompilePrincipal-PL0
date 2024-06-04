@@ -7,7 +7,6 @@
 
 //---------------------------------------------------------------------------
 const int AL = 10;	   /* LENGTH OF IDENTIFIERS */
-const int NORW = 14;   /* # OF RESERVED WORDS */
 const int TXMAX = 100; /* LENGTH OF IDENTIFIER TABLE */
 const int NMAX = 14;   /* MAX NUMBER OF DEGITS IN NUMBERS */
 const int AMAX = 2047; /* MAXIMUM ADDRESS */
@@ -235,11 +234,11 @@ auto WSYM = [] {
 	RETURNSYM
 	};
 	//sort by str
-	std::sort(key_words, key_words + NORW, [](SYMBOL a, SYMBOL b) {
+	constexpr size_t size = sizeof(key_words) / sizeof(SYMBOL);
+	std::sort(key_words, key_words + size, [](SYMBOL a, SYMBOL b) {
 		return strcmp(SYMBOL_INFO[a].str, SYMBOL_INFO[b].str) < 0;
 		});
 
-	constexpr size_t size = sizeof(key_words) / sizeof(SYMBOL);
 	std::array<SYMBOL, size + 1> arr;
 	for (size_t i = 0; i < size; i++)
 	{
@@ -248,6 +247,9 @@ auto WSYM = [] {
 
 	return arr;
 	}();
+
+const int NORW = WSYM.size()-1;
+
 
 
 auto KWORD = [] {
@@ -1014,8 +1016,8 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			Error(16);
 		CX1 = CX;
 		GEN(JPC, 0, 0);
-		STATEMENT(FSYS, LEV, TX);
-		CODE[CX1].A = CX;
+			STATEMENT(FSYS, LEV, TX);
+			CODE[CX1].A = CX;
 		break;
 	case BEGINSYM:
 		GetSym();
