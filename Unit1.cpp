@@ -471,12 +471,12 @@ void GetSym()
 		if (i - 1 > J)
 		{
 			SYM = WSYM[K];
-			//printf("关键字\n");
+			printf("关键字\n");
 		}
 		else
 		{
 			SYM = IDENT;
-			//printf("标识符\n");
+			printf("标识符\n");
 		}
 	}
 	else if (CH >= '0' && CH <= '9')
@@ -484,7 +484,7 @@ void GetSym()
 		K = 0;
 		NUM = 0;
 		SYM = NUMBER;
-		//printf("数字\n");
+		printf("数字\n");
 		do
 		{
 			NUM = 10 * NUM + (CH - '0');
@@ -500,7 +500,7 @@ void GetSym()
 		if (CH == '=')
 		{
 			SYM = BECOMES;
-			//printf("双符号\n");
+			printf("双符号\n");
 			GetCh();
 		}
 		else
@@ -514,13 +514,13 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = LEQ;
-				//printf("双符号\n");
+				printf("双符号\n");
 				GetCh();
 			}
 			else
 			{
 				SYM = LSS;
-				//printf("单字符\n");
+				printf("单字符\n");
 			}
 		}
 		else if (CH == '>')
@@ -529,19 +529,19 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = GEQ;
-				//printf("双符号\n");
+				printf("双符号\n");
 				GetCh();
 			}
 			else
 			{
 				SYM = GTR;
-				//printf("单字符\n");
+				printf("单字符\n");
 			}
 		}
 		else
 		{
 			SYM = SSYM[CH];
-			//printf("单字符\n");
+			printf("单字符\n");
 			GetCh();
 		}
 } /*GetSym()*/
