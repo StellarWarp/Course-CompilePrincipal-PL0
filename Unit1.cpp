@@ -29,12 +29,28 @@ typedef enum
 	TIMES,
 	SLASH,
 	ODDSYM,
+
 	EQL,
 	NEQ,
 	LSS,
 	LEQ,
 	GTR,
 	GEQ,
+
+	MULTIEQ,
+	DIVIDEQ,
+	INCREMENT,
+	DECREMENT,
+	AND,
+	OR,
+	NOT,
+	BIT_AND,
+	BIT_OR,
+	BIT_XOR,
+	LEFT_SHIFT,
+	RIGHT_SHIFT,
+	BIT_NOT,
+
 	LPAREN,
 	RPAREN,
 	COMMA,
@@ -43,6 +59,7 @@ typedef enum
 	BECOMES,
 	BEGINSYM,
 	ENDSYM,
+
 	IFSYM,
 	THENSYM,
 	WHILESYM,
@@ -55,56 +72,85 @@ typedef enum
 	PROCSYM,
 	PROGSYM,
 
+	ELSESYM,
+	FORSYM,
+	TOSYM,
+	DOWNTOSYM,
+	RETURNSYM,
+
 	MAX_SYMBOL
 } SYMBOL;
 
 struct symbol_info
 {
 	SYMBOL sym;
-	const char *str;
+	const char* str;
 };
 
 auto SYMBOL_INFO = [] {
-	
+
 	symbol_info arr[] = {
-        {NUL, "NUL"},
-        {IDENT, "IDENT"},
-        {NUMBER, "NUMBER"},
-        {PLUS, "+"},
-        {MINUS, "-"},
-        {TIMES, "*"},
-        {SLASH, "/"},
-        {ODDSYM, "ODD"},
-        {EQL, "="},
-        {NEQ, "#"},
-        {LSS, "<"},
-        {LEQ, "<="},
-        {GTR, ">"},
-        {GEQ, ">="},
-        {LPAREN, "("},
-        {RPAREN, ")"},
-        {COMMA, ","},
-        {SEMICOLON, ";"},
-        {PERIOD, "."},
-        {BECOMES, ":="},
-        {BEGINSYM, "BEGIN"},
-        {ENDSYM, "END"},
-        {IFSYM, "IF"},
-        {THENSYM, "THEN"},
-        {WHILESYM, "WHILE"},
-        {WRITESYM, "WRITE"},
-        {READSYM, "READ"},
-        {DOSYM, "DO"},
-        {CALLSYM, "CALL"},
-        {CONSTSYM, "CONST"},
-        {VARSYM, "VAR"},
-        {PROCSYM, "PROCEDURE"},
-        {PROGSYM, "PROGRAM"}
-    };
+		{NUL, "NUL"},
+		{IDENT, "IDENT"},
+		{NUMBER, "NUMBER"},
+
+		{PLUS, "+"},
+		{MINUS, "-"},
+		{TIMES, "*"},
+		{SLASH, "/"},
+		{ODDSYM, "ODD"},
+		{EQL, "="},
+		{NEQ, "<>"},
+		{LSS, "<"},
+		{LEQ, "<="},
+		{GTR, ">"},
+		{GEQ, ">="},
+		{LPAREN, "("},
+		{RPAREN, ")"},
+		{COMMA, ","},
+		{SEMICOLON, ";"},
+		{PERIOD, "."},
+		{BECOMES, ":="},
+
+		{MULTIEQ, "*="},
+		{DIVIDEQ, "/="},
+		{INCREMENT, "++"},
+		{DECREMENT, "--"},
+		{AND, "&&"},
+		{OR, "||"},
+		{NOT, "!"},
+		{BIT_AND, "&"},
+		{BIT_OR, "|"},
+		{BIT_XOR, "^"},
+		{LEFT_SHIFT, "<<"},
+		{RIGHT_SHIFT, ">>"},
+		{BIT_NOT, "~"},
+
+		{BEGINSYM, "BEGIN"},
+		{ENDSYM, "END"},
+		{IFSYM, "IF"},
+		{THENSYM, "THEN"},
+		{WHILESYM, "WHILE"},
+		{WRITESYM, "WRITE"},
+		{READSYM, "READ"},
+		{DOSYM, "DO"},
+		{CALLSYM, "CALL"},
+		{CONSTSYM, "CONST"},
+		{VARSYM, "VAR"},
+		{PROCSYM, "PROCEDURE"},
+		{PROGSYM, "PROGRAM"},
+
+
+		{ELSESYM, "ELSE"},
+		{FORSYM, "FOR"},
+		{TOSYM, "TO"},
+		{DOWNTOSYM, "DOWNTO"},
+		{RETURNSYM, "RETURN"}
+	};
 
 	std::array<symbol_info, MAX_SYMBOL> bucket{};
-	
-	for(auto &info : arr)
+
+	for (auto& info : arr)
 	{
 		bucket[info.sym] = info;
 	}
@@ -159,30 +205,14 @@ INSTRUCTION CODE[CXMAX];
 
 
 auto SSYM = [] {
-	SYMBOL direct_sym[] = {
-		PLUS,
-		MINUS,
-		TIMES,
-		SLASH,
-		LPAREN,
-		RPAREN,
-		EQL,
-		COMMA,
-		PERIOD,
-		NEQ,
-		SEMICOLON
-	};
-
 	std::array<SYMBOL, 128> bucket{};
-	//test using SYMBOL_INFO
-	for (int i = 0; i < sizeof(direct_sym) / sizeof(SYMBOL); i++)
-	{
-		bucket[SYMBOL_INFO[direct_sym[i]].str[0]] = direct_sym[i];
-	};
+	for (int i = 0; i < MAX_SYMBOL; i++)
+		if(strlen(SYMBOL_INFO[i].str) == 1)
+			bucket[SYMBOL_INFO[i].str[0]] = SYMBOL_INFO[i].sym;
 	return bucket;
 	}();
 
-auto WSYM = []{
+auto WSYM = [] {
 	SYMBOL key_words[] = {
 	BEGINSYM,
 	CALLSYM,
@@ -197,22 +227,27 @@ auto WSYM = []{
 	THENSYM,
 	VARSYM,
 	WHILESYM,
-	WRITESYM
+	WRITESYM,
+	ELSESYM,
+	FORSYM,
+	TOSYM,
+	DOWNTOSYM,
+	RETURNSYM
 	};
 	//sort by str
 	std::sort(key_words, key_words + NORW, [](SYMBOL a, SYMBOL b) {
 		return strcmp(SYMBOL_INFO[a].str, SYMBOL_INFO[b].str) < 0;
-	});
+		});
 
 	constexpr size_t size = sizeof(key_words) / sizeof(SYMBOL);
 	std::array<SYMBOL, size + 1> arr;
 	for (size_t i = 0; i < size; i++)
 	{
-		arr[i+1] = key_words[i];
+		arr[i + 1] = key_words[i];
 	}
 
 	return arr;
-}();
+	}();
 
 
 auto KWORD = [] {
@@ -237,7 +272,7 @@ auto MNEMONIC = []() {
 	strcpy(arr[JMP], "JMP");
 	strcpy(arr[JPC], "JPC");
 	return arr;
-}();
+	}();
 
 
 auto DECLBEGSYS = [] {
@@ -246,7 +281,7 @@ auto DECLBEGSYS = [] {
 	arr[VARSYM] = 1;
 	arr[PROCSYM] = 1;
 	return arr;
-}();
+	}();
 auto STATBEGSYS = [] {
 	static int arr[MAX_SYMBOL]{};
 	arr[BEGINSYM] = 1;
@@ -255,7 +290,7 @@ auto STATBEGSYS = [] {
 	arr[WHILESYM] = 1;
 	arr[WRITESYM] = 1;
 	return arr;
-}();
+	}();
 
 auto FACBEGSYS = [] {
 	static int arr[MAX_SYMBOL]{};
@@ -263,7 +298,7 @@ auto FACBEGSYS = [] {
 	arr[NUMBER] = 1;
 	arr[LPAREN] = 1;
 	return arr;
-}();
+	}();
 
 struct
 {
@@ -279,11 +314,11 @@ struct
 	};
 } TABLE[TXMAX];
 
-FILE *FIN, *FOUT;
+FILE* FIN, * FOUT;
 int ERR;
 
-void EXPRESSION(SYMSET FSYS, int LEV, int &TX);
-void TERM(SYMSET FSYS, int LEV, int &TX);
+void EXPRESSION(SYMSET FSYS, int LEV, int& TX);
+void TERM(SYMSET FSYS, int LEV, int& TX);
 //---------------------------------------------------------------------------
 int SymIn(SYMBOL SYM, SYMSET S1)
 {
@@ -404,7 +439,7 @@ SYMSET SymSetNULL()
 //---------------------------------------------------------------------------
 void Error(int n)
 {
-    std::string s = "***" + std::string(CC - 1, ' ') + "^";
+	std::string s = "***" + std::string(CC - 1, ' ') + "^";
 	printf("%s\n", s.c_str());
 	fprintf(FOUT, "%s%d\n", s.c_str(), n);
 	ERR++;
@@ -471,12 +506,10 @@ void GetSym()
 		if (i - 1 > J)
 		{
 			SYM = WSYM[K];
-			//printf("关键字\n");
 		}
 		else
 		{
 			SYM = IDENT;
-			//printf("标识符\n");
 		}
 	}
 	else if (CH >= '0' && CH <= '9')
@@ -484,7 +517,6 @@ void GetSym()
 		K = 0;
 		NUM = 0;
 		SYM = NUMBER;
-		//printf("数字\n");
 		do
 		{
 			NUM = 10 * NUM + (CH - '0');
@@ -500,50 +532,147 @@ void GetSym()
 		if (CH == '=')
 		{
 			SYM = BECOMES;
-			//printf("双符号\n");
 			GetCh();
 		}
 		else
 			SYM = NUL;
 	}
-	else /* THE FOLLOWING TWO CHECK WERE ADDED
+	/* THE FOLLOWING TWO CHECK WERE ADDED
 		   BECAUSE ASCII DOES NOT HAVE A SINGLE CHARACTER FOR <= OR >= */
-		if (CH == '<')
+	else if (CH == '<')
+	{
+		GetCh();
+		if (CH == '=')
 		{
+			SYM = LEQ;
 			GetCh();
-			if (CH == '=')
-			{
-				SYM = LEQ;
-				//printf("双符号\n");
-				GetCh();
-			}
-			else
-			{
-				SYM = LSS;
-				//printf("单字符\n");
-			}
 		}
 		else if (CH == '>')
 		{
+			SYM = NEQ;
 			GetCh();
-			if (CH == '=')
-			{
-				SYM = GEQ;
-				//printf("双符号\n");
-				GetCh();
-			}
-			else
-			{
-				SYM = GTR;
-				//printf("单字符\n");
-			}
+		}
+		else if (CH == '<')
+		{
+			SYM = LEFT_SHIFT;
+			GetCh();
 		}
 		else
 		{
-			SYM = SSYM[CH];
-			//printf("单字符\n");
+			SYM = LSS;
+		}
+	}
+	else if (CH == '>')
+	{
+		GetCh();
+		if (CH == '=')
+		{
+			SYM = GEQ;
 			GetCh();
 		}
+		else if (CH == '<')
+		{
+			SYM = NEQ;
+			GetCh();
+		}
+		else
+		{
+			SYM = GTR;
+		}
+	}
+	else if (CH == '*')
+	{
+		GetCh();
+		if (CH == '=')
+		{
+			SYM = MULTIEQ;
+			GetCh();
+		}
+		else
+		{
+			SYM = TIMES;
+		}
+	}
+	else if (CH == '/')
+	{
+		GetCh();
+		if (CH == '=')
+		{
+			SYM = DIVIDEQ;
+			GetCh();
+		}
+		else
+		{
+			SYM = SLASH;
+		}
+	}
+	else if (CH == '+')
+	{
+		GetCh();
+		if (CH == '+')
+		{
+			SYM = INCREMENT;
+			GetCh();
+		}
+		else
+		{
+			SYM = PLUS;
+		}
+	}
+	else if (CH == '-')
+	{
+		GetCh();
+		if (CH == '-')
+		{
+			SYM = DECREMENT;
+			GetCh();
+		}
+		else
+		{
+			SYM = MINUS;
+		}
+	}
+	else if (CH == '&')
+	{
+		GetCh();
+		if (CH == '&')
+		{
+			SYM = AND;
+			GetCh();
+		}
+		else
+		{
+			SYM = BIT_AND;
+		}
+	}
+	else if (CH == '|')
+	{
+		GetCh();
+		if (CH == '|')
+		{
+			SYM = OR;
+			GetCh();
+		}
+		else
+		{
+			SYM = BIT_OR;
+		}
+	}
+	else if (CH == '^')
+	{
+		GetCh();
+		SYM = BIT_XOR;
+	}
+	else if (CH == '~')
+	{
+		GetCh();
+		SYM = BIT_NOT;
+	}
+	else
+	{
+		SYM = SSYM[CH];
+		GetCh();
+	}
 } /*GetSym()*/
 //---------------------------------------------------------------------------
 void GEN(FCT X, int Y, int Z)
@@ -571,7 +700,7 @@ void TEST(SYMSET S1, SYMSET S2, int N)
 	}
 } /*TEST*/
 //---------------------------------------------------------------------------
-void ENTER(OBJECTS K, int LEV, int &TX, int &DX)
+void ENTER(OBJECTS K, int LEV, int& TX, int& DX)
 { /*ENTER OBJECT INTO TABLE*/
 	TX++;
 	strcpy(TABLE[TX].NAME, ID);
@@ -606,7 +735,7 @@ int POSITION(ALFA ID, int TX)
 	return i;
 } /*POSITION*/
 //---------------------------------------------------------------------------
-void ConstDeclaration(int LEV, int &TX, int &DX)
+void ConstDeclaration(int LEV, int& TX, int& DX)
 {
 	if (SYM == IDENT)
 	{
@@ -631,7 +760,7 @@ void ConstDeclaration(int LEV, int &TX, int &DX)
 		Error(4);
 } /*ConstDeclaration()*/
 //---------------------------------------------------------------------------
-void VarDeclaration(int LEV, int &TX, int &DX)
+void VarDeclaration(int LEV, int& TX, int& DX)
 {
 	if (SYM == IDENT)
 	{
@@ -645,18 +774,18 @@ void VarDeclaration(int LEV, int &TX, int &DX)
 void ListCode(int CX0)
 { /*LIST CODE GENERATED FOR THIS Block*/
 	//if (Form1->ListSwitch->ItemIndex == 0)
-		for (int i = CX0; i < CX; i++)
-		{
-			std::string s = std::to_string(i);
-			while (s.size() < 3)
-				s = " " + s;
-			s = s + " " + MNEMONIC[CODE[i].F] + " " + std::to_string(CODE[i].L) + " " + std::to_string(CODE[i].A);
-			printf("%s\n", s.c_str());
-			fprintf(FOUT, "%3d%5s%4d%4d\n", i, MNEMONIC[CODE[i].F], CODE[i].L, CODE[i].A);
-		}
+	for (int i = CX0; i < CX; i++)
+	{
+		std::string s = std::to_string(i);
+		while (s.size() < 3)
+			s = " " + s;
+		s = s + " " + MNEMONIC[CODE[i].F] + " " + std::to_string(CODE[i].L) + " " + std::to_string(CODE[i].A);
+		printf("%s\n", s.c_str());
+		fprintf(FOUT, "%3d%5s%4d%4d\n", i, MNEMONIC[CODE[i].F], CODE[i].L, CODE[i].A);
+	}
 } /*ListCode()*/;
 //---------------------------------------------------------------------------
-void FACTOR(SYMSET FSYS, int LEV, int &TX)
+void FACTOR(SYMSET FSYS, int LEV, int& TX)
 {
 	int i;
 	TEST(FACBEGSYS, FSYS, 24);
@@ -705,7 +834,7 @@ void FACTOR(SYMSET FSYS, int LEV, int &TX)
 	}
 } /*FACTOR*/
 //---------------------------------------------------------------------------
-void TERM(SYMSET FSYS, int LEV, int &TX)
+void TERM(SYMSET FSYS, int LEV, int& TX)
 { /*TERM*/
 	SYMBOL MULOP;
 	FACTOR(SymSetUnion(FSYS, SymSetNew(TIMES, SLASH)), LEV, TX);
@@ -721,7 +850,7 @@ void TERM(SYMSET FSYS, int LEV, int &TX)
 	}
 } /*TERM*/;
 //---------------------------------------------------------------------------
-void EXPRESSION(SYMSET FSYS, int LEV, int &TX)
+void EXPRESSION(SYMSET FSYS, int LEV, int& TX)
 {
 	SYMBOL ADDOP;
 	if (SYM == PLUS || SYM == MINUS)
@@ -746,7 +875,7 @@ void EXPRESSION(SYMSET FSYS, int LEV, int &TX)
 	}
 } /*EXPRESSION*/
 //---------------------------------------------------------------------------
-void CONDITION(SYMSET FSYS, int LEV, int &TX)
+void CONDITION(SYMSET FSYS, int LEV, int& TX)
 {
 	SYMBOL RELOP;
 	if (SYM == ODDSYM)
@@ -790,7 +919,7 @@ void CONDITION(SYMSET FSYS, int LEV, int &TX)
 	}
 } /*CONDITION*/
 //---------------------------------------------------------------------------
-void STATEMENT(SYMSET FSYS, int LEV, int &TX)
+void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 { /*STATEMENT*/
 	int i, CX1, CX2;
 	switch (SYM)
