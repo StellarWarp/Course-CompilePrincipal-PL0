@@ -310,15 +310,22 @@ void GetSym()
 				i = K + 1;
 		} while (i <= J);
 		if (i - 1 > J)
+		{
 			SYM = WSYM[K];
+			Form1->printfs("关键字");
+		}
 		else
+		{
 			SYM = IDENT;
+			Form1->printfs("标识符");
+		}
 	}
 	else if (CH >= '0' && CH <= '9')
 	{ /*NUMBER*/
 		K = 0;
 		NUM = 0;
 		SYM = NUMBER;
+		Form1->printfs("数字");
 		do
 		{
 			NUM = 10 * NUM + (CH - '0');
@@ -334,6 +341,7 @@ void GetSym()
 		if (CH == '=')
 		{
 			SYM = BECOMES;
+			Form1->printfs("双符号");
 			GetCh();
 		}
 		else
@@ -347,10 +355,14 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = LEQ;
+				Form1->printfs("双符号");
 				GetCh();
 			}
 			else
+			{
 				SYM = LSS;
+				Form1->printfs("单字符");
+			}
 		}
 		else if (CH == '>')
 		{
@@ -358,14 +370,19 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = GEQ;
+				Form1->printfs("双符号");
 				GetCh();
 			}
 			else
+			{
 				SYM = GTR;
+				Form1->printfs("单字符");
+			}
 		}
 		else
 		{
 			SYM = SSYM[CH];
+			Form1->printfs("单字符");
 			GetCh();
 		}
 } /*GetSym()*/
