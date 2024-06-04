@@ -1,20 +1,23 @@
 /*** PL0 COMPILER WITH CODE GENERATION ***/
+#include <memory>
+#include <string>
+#include <iostream>
+#include <array>
+#include <algorithm>
+
 //---------------------------------------------------------------------------
-#include <vcl.h>
-#pragma hdrstop
-#include "Unit1.h"
-//---------------------------------------------------------------------------
-#pragma package(smart_init)
-#pragma resource "*.dfm"
-TForm1 *Form1;
-//---------------------------------------------------------------------------
-const AL = 10;	   /* LENGTH OF IDENTIFIERS */
-const NORW = 14;   /* # OF RESERVED WORDS */
-const TXMAX = 100; /* LENGTH OF IDENTIFIER TABLE */
-const NMAX = 14;   /* MAX NUMBER OF DEGITS IN NUMBERS */
-const AMAX = 2047; /* MAXIMUM ADDRESS */
-const LEVMAX = 3;  /* MAX DEPTH OF BLOCK NESTING */
-const CXMAX = 200; /* SIZE OF CODE ARRAY */
+const int AL = 10;	   /* LENGTH OF IDENTIFIERS */
+const int NORW = 14;   /* # OF RESERVED WORDS */
+const int TXMAX = 100; /* LENGTH OF IDENTIFIER TABLE */
+const int NMAX = 14;   /* MAX NUMBER OF DEGITS IN NUMBERS */
+const int AMAX = 2047; /* MAXIMUM ADDRESS */
+const int LEVMAX = 3;  /* MAX DEPTH OF BLOCK NESTING */
+const int CXMAX = 200; /* SIZE OF CODE ARRAY */
+
+
+
+
+
 
 typedef enum
 {
@@ -50,22 +53,75 @@ typedef enum
 	CONSTSYM,
 	VARSYM,
 	PROCSYM,
-	PROGSYM
+	PROGSYM,
+
+	MAX_SYMBOL
 } SYMBOL;
-char *SYMOUT[] = {"NUL", "IDENT", "NUMBER", "PLUS", "MINUS", "TIMES",
-				  "SLASH", "ODDSYM", "EQL", "NEQ", "LSS", "LEQ", "GTR", "GEQ",
-				  "LPAREN", "RPAREN", "COMMA", "SEMICOLON", "PERIOD",
-				  "BECOMES", "BEGINSYM", "ENDSYM", "IFSYM", "THENSYM",
-				  "WHILESYM", "WRITESYM", "READSYM", "DOSYM", "CALLSYM",
-				  "CONSTSYM", "VARSYM", "PROCSYM", "PROGSYM"};
-typedef int *SYMSET; // SET OF SYMBOL;
-typedef char ALFA[11];
+
+struct symbol_info
+{
+	SYMBOL sym;
+	const char *str;
+};
+
+auto SYMBOL_INFO = [] {
+	
+	symbol_info arr[] = {
+        {NUL, "NUL"},
+        {IDENT, "IDENT"},
+        {NUMBER, "NUMBER"},
+        {PLUS, "+"},
+        {MINUS, "-"},
+        {TIMES, "*"},
+        {SLASH, "/"},
+        {ODDSYM, "ODD"},
+        {EQL, "="},
+        {NEQ, "#"},
+        {LSS, "<"},
+        {LEQ, "<="},
+        {GTR, ">"},
+        {GEQ, ">="},
+        {LPAREN, "("},
+        {RPAREN, ")"},
+        {COMMA, ","},
+        {SEMICOLON, ";"},
+        {PERIOD, "."},
+        {BECOMES, ":="},
+        {BEGINSYM, "BEGIN"},
+        {ENDSYM, "END"},
+        {IFSYM, "IF"},
+        {THENSYM, "THEN"},
+        {WHILESYM, "WHILE"},
+        {WRITESYM, "WRITE"},
+        {READSYM, "READ"},
+        {DOSYM, "DO"},
+        {CALLSYM, "CALL"},
+        {CONSTSYM, "CONST"},
+        {VARSYM, "VAR"},
+        {PROCSYM, "PROCEDURE"},
+        {PROGSYM, "PROGRAM"}
+    };
+
+	std::array<symbol_info, MAX_SYMBOL> bucket{};
+	
+	for(auto &info : arr)
+	{
+		bucket[info.sym] = info;
+	}
+	return bucket;
+	}();
+
+
+
+using SYMSET = int*;
+using ALFA = char[11];
 typedef enum
 {
 	CONSTANT,
 	VARIABLE,
 	PROCEDUR
 } OBJECTS;
+
 typedef enum
 {
 	LIT,
@@ -100,11 +156,114 @@ int LL;		/*LINE LENGTH*/
 int CX;		/*CODE ALLOCATION INDEX*/
 char LINE[81];
 INSTRUCTION CODE[CXMAX];
-ALFA KWORD[NORW + 1];
-SYMBOL WSYM[NORW + 1];
-SYMBOL SSYM['^' + 1];
-ALFA MNEMONIC[9];
-SYMSET DECLBEGSYS, STATBEGSYS, FACBEGSYS;
+
+
+auto SSYM = [] {
+	SYMBOL direct_sym[] = {
+		PLUS,
+		MINUS,
+		TIMES,
+		SLASH,
+		LPAREN,
+		RPAREN,
+		EQL,
+		COMMA,
+		PERIOD,
+		NEQ,
+		SEMICOLON
+	};
+
+	std::array<SYMBOL, 128> bucket{};
+	//test using SYMBOL_INFO
+	for (int i = 0; i < sizeof(direct_sym) / sizeof(SYMBOL); i++)
+	{
+		bucket[SYMBOL_INFO[direct_sym[i]].str[0]] = direct_sym[i];
+	};
+	return bucket;
+	}();
+
+auto WSYM = []{
+	SYMBOL key_words[] = {
+	BEGINSYM,
+	CALLSYM,
+	CONSTSYM,
+	DOSYM,
+	ENDSYM,
+	IFSYM,
+	ODDSYM,
+	PROCSYM,
+	PROGSYM,
+	READSYM,
+	THENSYM,
+	VARSYM,
+	WHILESYM,
+	WRITESYM
+	};
+	//sort by str
+	std::sort(key_words, key_words + NORW, [](SYMBOL a, SYMBOL b) {
+		return strcmp(SYMBOL_INFO[a].str, SYMBOL_INFO[b].str) < 0;
+	});
+
+	constexpr size_t size = sizeof(key_words) / sizeof(SYMBOL);
+	std::array<SYMBOL, size + 1> arr;
+	for (size_t i = 0; i < size; i++)
+	{
+		arr[i+1] = key_words[i];
+	}
+
+	return arr;
+}();
+
+
+auto KWORD = [] {
+	//look up in SYMBOL_INFO
+	std::array<ALFA, WSYM.size()> arr{};
+	for (int i = 1; i < WSYM.size(); i++)
+	{
+		strcpy(arr[i], SYMBOL_INFO[WSYM[i]].str);
+	};
+	return arr;
+	}();
+
+
+auto MNEMONIC = []() {
+	std::array<ALFA, 8> arr{};
+	strcpy(arr[LIT], "LIT");
+	strcpy(arr[OPR], "OPR");
+	strcpy(arr[LOD], "LOD");
+	strcpy(arr[STO], "STO");
+	strcpy(arr[CAL], "CAL");
+	strcpy(arr[INI], "INI");
+	strcpy(arr[JMP], "JMP");
+	strcpy(arr[JPC], "JPC");
+	return arr;
+}();
+
+
+auto DECLBEGSYS = [] {
+	static int arr[MAX_SYMBOL]{};
+	arr[CONSTSYM] = 1;
+	arr[VARSYM] = 1;
+	arr[PROCSYM] = 1;
+	return arr;
+}();
+auto STATBEGSYS = [] {
+	static int arr[MAX_SYMBOL]{};
+	arr[BEGINSYM] = 1;
+	arr[CALLSYM] = 1;
+	arr[IFSYM] = 1;
+	arr[WHILESYM] = 1;
+	arr[WRITESYM] = 1;
+	return arr;
+}();
+
+auto FACBEGSYS = [] {
+	static int arr[MAX_SYMBOL]{};
+	arr[IDENT] = 1;
+	arr[NUMBER] = 1;
+	arr[LPAREN] = 1;
+	return arr;
+}();
 
 struct
 {
@@ -133,8 +292,8 @@ int SymIn(SYMBOL SYM, SYMSET S1)
 //---------------------------------------------------------------------------
 SYMSET SymSetUnion(SYMSET S1, SYMSET S2)
 {
-	SYMSET S = (SYMSET)malloc(sizeof(int) * 33);
-	for (int i = 0; i < 33; i++)
+	SYMSET S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (int i = 0; i < MAX_SYMBOL; i++)
 		if (S1[i] || S2[i])
 			S[i] = 1;
 		else
@@ -145,8 +304,8 @@ SYMSET SymSetUnion(SYMSET S1, SYMSET S2)
 SYMSET SymSetAdd(SYMBOL SY, SYMSET S)
 {
 	SYMSET S1;
-	S1 = (SYMSET)malloc(sizeof(int) * 33);
-	for (int i = 0; i < 33; i++)
+	S1 = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (int i = 0; i < MAX_SYMBOL; i++)
 		S1[i] = S[i];
 	S1[SY] = 1;
 	return S1;
@@ -156,8 +315,8 @@ SYMSET SymSetNew(SYMBOL a)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	return S;
@@ -167,8 +326,8 @@ SYMSET SymSetNew(SYMBOL a, SYMBOL b)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	S[b] = 1;
@@ -179,8 +338,8 @@ SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	S[b] = 1;
@@ -192,8 +351,8 @@ SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	S[b] = 1;
@@ -206,8 +365,8 @@ SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d, SYMBOL e)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	S[b] = 1;
@@ -221,8 +380,8 @@ SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d, SYMBOL e, SYMBOL f)
 {
 	SYMSET S;
 	int i, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	S[a] = 1;
 	S[b] = 1;
@@ -237,16 +396,16 @@ SYMSET SymSetNULL()
 {
 	SYMSET S;
 	int i, n, k;
-	S = (SYMSET)malloc(sizeof(int) * 33);
-	for (i = 0; i < 33; i++)
+	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
+	for (i = 0; i < MAX_SYMBOL; i++)
 		S[i] = 0;
 	return S;
 }
 //---------------------------------------------------------------------------
 void Error(int n)
 {
-	String s = "***" + AnsiString::StringOfChar(' ', CC - 1) + "^";
-	Form1->printls(s.c_str(), n);
+    std::string s = "***" + std::string(CC - 1, ' ') + "^";
+	printf("%s\n", s.c_str());
 	fprintf(FOUT, "%s%d\n", s.c_str(), n);
 	ERR++;
 } /*Error*/
@@ -257,7 +416,7 @@ void GetCh()
 	{
 		if (feof(FIN))
 		{
-			Form1->printfs("PROGRAM INCOMPLETE");
+			printf("PROGRAM INCOMPLETE\n");
 			fprintf(FOUT, "PROGRAM INCOMPLETE\n");
 			fclose(FOUT);
 			exit(0);
@@ -272,11 +431,11 @@ void GetCh()
 		}
 		LINE[LL - 1] = ' ';
 		LINE[LL] = 0;
-		String s = IntToStr(CX);
-		while (s.Length() < 3)
+		std::string s = std::to_string(CX);
+		while (s.size() < 3)//todo check
 			s = " " + s;
 		s = s + " " + LINE;
-		Form1->printfs(s.c_str());
+		printf("%s\n", s.c_str());
 		fprintf(FOUT, "%s\n", s);
 	}
 	CH = LINE[CC++];
@@ -312,12 +471,12 @@ void GetSym()
 		if (i - 1 > J)
 		{
 			SYM = WSYM[K];
-			Form1->printfs("关键字");
+			//printf("关键字\n");
 		}
 		else
 		{
 			SYM = IDENT;
-			Form1->printfs("标识符");
+			//printf("标识符\n");
 		}
 	}
 	else if (CH >= '0' && CH <= '9')
@@ -325,7 +484,7 @@ void GetSym()
 		K = 0;
 		NUM = 0;
 		SYM = NUMBER;
-		Form1->printfs("数字");
+		//printf("数字\n");
 		do
 		{
 			NUM = 10 * NUM + (CH - '0');
@@ -341,7 +500,7 @@ void GetSym()
 		if (CH == '=')
 		{
 			SYM = BECOMES;
-			Form1->printfs("双符号");
+			//printf("双符号\n");
 			GetCh();
 		}
 		else
@@ -355,13 +514,13 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = LEQ;
-				Form1->printfs("双符号");
+				//printf("双符号\n");
 				GetCh();
 			}
 			else
 			{
 				SYM = LSS;
-				Form1->printfs("单字符");
+				//printf("单字符\n");
 			}
 		}
 		else if (CH == '>')
@@ -370,19 +529,19 @@ void GetSym()
 			if (CH == '=')
 			{
 				SYM = GEQ;
-				Form1->printfs("双符号");
+				//printf("双符号\n");
 				GetCh();
 			}
 			else
 			{
 				SYM = GTR;
-				Form1->printfs("单字符");
+				//printf("单字符\n");
 			}
 		}
 		else
 		{
 			SYM = SSYM[CH];
-			Form1->printfs("单字符");
+			//printf("单字符\n");
 			GetCh();
 		}
 } /*GetSym()*/
@@ -391,7 +550,7 @@ void GEN(FCT X, int Y, int Z)
 {
 	if (CX > CXMAX)
 	{
-		Form1->printfs("PROGRAM TOO LONG");
+		printf("PROGRAM TOO LONG\n");
 		fprintf(FOUT, "PROGRAM TOO LONG\n");
 		fclose(FOUT);
 		exit(0);
@@ -485,14 +644,14 @@ void VarDeclaration(int LEV, int &TX, int &DX)
 //---------------------------------------------------------------------------
 void ListCode(int CX0)
 { /*LIST CODE GENERATED FOR THIS Block*/
-	if (Form1->ListSwitch->ItemIndex == 0)
+	//if (Form1->ListSwitch->ItemIndex == 0)
 		for (int i = CX0; i < CX; i++)
 		{
-			String s = IntToStr(i);
-			while (s.Length() < 3)
+			std::string s = std::to_string(i);
+			while (s.size() < 3)
 				s = " " + s;
-			s = s + " " + MNEMONIC[CODE[i].F] + " " + IntToStr(CODE[i].L) + " " + IntToStr(CODE[i].A);
-			Form1->printfs(s.c_str());
+			s = s + " " + MNEMONIC[CODE[i].F] + " " + std::to_string(CODE[i].L) + " " + std::to_string(CODE[i].A);
+			printf("%s\n", s.c_str());
 			fprintf(FOUT, "%3d%5s%4d%4d\n", i, MNEMONIC[CODE[i].F], CODE[i].L, CODE[i].A);
 		}
 } /*ListCode()*/;
@@ -677,7 +836,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int &TX)
 			} while (SYM == COMMA);
 		if (SYM != RPAREN)
 		{
-			Error(33);
+			Error(MAX_SYMBOL);
 			while (!SymIn(SYM, FSYS))
 				GetSym();
 		}
@@ -695,7 +854,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int &TX)
 				GEN(OPR, 0, 14);
 			} while (SYM == COMMA);
 			if (SYM != RPAREN)
-				Error(33);
+				Error(MAX_SYMBOL);
 			else
 				GetSym();
 		}
@@ -856,11 +1015,11 @@ int BASE(int L, int B, int S[])
 //---------------------------------------------------------------------------
 void Interpret()
 {
-	const STACKSIZE = 500;
+	const int STACKSIZE = 500;
 	int P, B, T; /*PROGRAM BASE TOPSTACK REGISTERS*/
 	INSTRUCTION I;
 	int S[STACKSIZE]; /*DATASTORE*/
-	Form1->printfs("~~~ RUN PL0 ~~~");
+	printf("~~~ RUN PL0 ~~~\n");
 	fprintf(FOUT, "~~~ RUN PL0 ~~~\n");
 	T = 0;
 	B = 1;
@@ -933,16 +1092,17 @@ void Interpret()
 				S[T] = S[T] <= S[T + 1];
 				break;
 			case 14:
-				Form1->printls("", S[T]);
+				printf("%d\n", S[T]);
 				fprintf(FOUT, "%d\n", S[T]);
 				T--;
 				break;
-			case 15: /*Form1->printfs(""); fprintf(FOUT,"\n"); */
+			case 15: /*printf(""); fprintf(FOUT,"\n"); */
 				break;
 			case 16:
 				T++;
-				S[T] = InputBox("����", "��������룺", 0).ToInt();
-				Form1->printls("? ", S[T]);
+				std::cout << "请输入一个整数：";
+				std::cin >> S[T];
+				printf("? %d\n", S[T]);
 				fprintf(FOUT, "? %d\n", S[T]);
 				break;
 			}
@@ -975,87 +1135,21 @@ void Interpret()
 			break;
 		} /*switch*/
 	} while (P != 0);
-	Form1->printfs("~~~ END PL0 ~~~");
+	printf("~~~ END PL0 ~~~");
 	fprintf(FOUT, "~~~ END PL0 ~~~\n");
 } /*Interpret*/
 //---------------------------------------------------------------------------
-void __fastcall TForm1::ButtonRunClick(TObject *Sender)
+void ButtonRunClick()
 {
-	for (CH = ' '; CH <= '^'; CH++)
-		SSYM[CH] = NUL;
-	strcpy(KWORD[1], "BEGIN");
-	strcpy(KWORD[2], "CALL");
-	strcpy(KWORD[3], "CONST");
-	strcpy(KWORD[4], "DO");
-	strcpy(KWORD[5], "END");
-	strcpy(KWORD[6], "IF");
-	strcpy(KWORD[7], "ODD");
-	strcpy(KWORD[8], "PROCEDURE");
-	strcpy(KWORD[9], "PROGRAM");
-	strcpy(KWORD[10], "READ");
-	strcpy(KWORD[11], "THEN");
-	strcpy(KWORD[12], "VAR");
-	strcpy(KWORD[13], "WHILE");
-	strcpy(KWORD[14], "WRITE");
-	WSYM[1] = BEGINSYM;
-	WSYM[2] = CALLSYM;
-	WSYM[3] = CONSTSYM;
-	WSYM[4] = DOSYM;
-	WSYM[5] = ENDSYM;
-	WSYM[6] = IFSYM;
-	WSYM[7] = ODDSYM;
-	WSYM[8] = PROCSYM;
-	WSYM[9] = PROGSYM;
-	WSYM[10] = READSYM;
-	WSYM[11] = THENSYM;
-	WSYM[12] = VARSYM;
-	WSYM[13] = WHILESYM;
-	WSYM[14] = WRITESYM;
-	SSYM['+'] = PLUS;
-	SSYM['-'] = MINUS;
-	SSYM['*'] = TIMES;
-	SSYM['/'] = SLASH;
-	SSYM['('] = LPAREN;
-	SSYM[')'] = RPAREN;
-	SSYM['='] = EQL;
-	SSYM[','] = COMMA;
-	SSYM['.'] = PERIOD;
-	SSYM['#'] = NEQ;
-	SSYM[';'] = SEMICOLON;
-	strcpy(MNEMONIC[LIT], "LIT");
-	strcpy(MNEMONIC[OPR], "OPR");
-	strcpy(MNEMONIC[LOD], "LOD");
-	strcpy(MNEMONIC[STO], "STO");
-	strcpy(MNEMONIC[CAL], "CAL");
-	strcpy(MNEMONIC[INI], "INI");
-	strcpy(MNEMONIC[JMP], "JMP");
-	strcpy(MNEMONIC[JPC], "JPC");
+	std::string filename;
 
-	DECLBEGSYS = (int *)malloc(sizeof(int) * 33);
-	STATBEGSYS = (int *)malloc(sizeof(int) * 33);
-	FACBEGSYS = (int *)malloc(sizeof(int) * 33);
-	for (int j = 0; j < 33; j++)
-	{
-		DECLBEGSYS[j] = 0;
-		STATBEGSYS[j] = 0;
-		FACBEGSYS[j] = 0;
-	}
-	DECLBEGSYS[CONSTSYM] = 1;
-	DECLBEGSYS[VARSYM] = 1;
-	DECLBEGSYS[PROCSYM] = 1;
-	STATBEGSYS[BEGINSYM] = 1;
-	STATBEGSYS[CALLSYM] = 1;
-	STATBEGSYS[IFSYM] = 1;
-	STATBEGSYS[WHILESYM] = 1;
-	STATBEGSYS[WRITESYM] = 1;
-	FACBEGSYS[IDENT] = 1;
-	FACBEGSYS[NUMBER] = 1;
-	FACBEGSYS[LPAREN] = 1;
+	std::cout << "请输入文件名：";
+	std::cin >> filename;
 
-	if ((FIN = fopen((Form1->EditName->Text + ".PL0").c_str(), "r")) != 0)
+	if ((FIN = fopen((filename + ".PL0").c_str(), "r")) != 0)
 	{
-		FOUT = fopen((Form1->EditName->Text + ".COD").c_str(), "w");
-		Form1->printfs("=== COMPILE PL0 ===");
+		FOUT = fopen((filename + ".COD").c_str(), "w");
+		printf("=== COMPILE PL0 ===\n");
 		fprintf(FOUT, "=== COMPILE PL0 ===\n");
 		ERR = 0;
 		CC = 0;
@@ -1086,11 +1180,15 @@ void __fastcall TForm1::ButtonRunClick(TObject *Sender)
 			Interpret();
 		else
 		{
-			Form1->printfs("ERROR IN PL/0 PROGRAM");
+			printf("ERROR IN PL/0 PROGRAM\n");
 			fprintf(FOUT, "ERROR IN PL/0 PROGRAM");
 		}
 		fprintf(FOUT, "\n");
 		fclose(FOUT);
+	}
+	else
+	{
+		printf("CAN'T OPEN FILE %s\n", (filename + ".PL0").c_str());
 	}
 }
 //---------------------------------------------------------------------------
