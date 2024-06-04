@@ -1016,8 +1016,20 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			Error(16);
 		CX1 = CX;
 		GEN(JPC, 0, 0);
-			STATEMENT(FSYS, LEV, TX);
+		STATEMENT(SymSetUnion(SymSetNew(ELSESYM, DOSYM), FSYS), LEV, TX);
+		//support for ELSE
+		if (SYM == ELSESYM)
+		{
+			GetSym();
+			CX2 = CX;
+			GEN(JMP, 0, 0);//jump for if hited
 			CODE[CX1].A = CX;
+			STATEMENT(FSYS, LEV, TX);
+			CODE[CX2].A = CX;
+		}
+		else
+			CODE[CX1].A = CX;
+
 		break;
 	case BEGINSYM:
 		GetSym();
