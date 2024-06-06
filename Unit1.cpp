@@ -539,8 +539,6 @@ void GetSym()
 		else
 			SYM = NUL;
 	}
-	/* THE FOLLOWING TWO CHECK WERE ADDED
-		   BECAUSE ASCII DOES NOT HAVE A SINGLE CHARACTER FOR <= OR >= */
 	else if (CH == '<')
 	{
 		GetCh();
@@ -572,9 +570,9 @@ void GetSym()
 			SYM = GEQ;
 			GetCh();
 		}
-		else if (CH == '<')
+		else if (CH == '>')
 		{
-			SYM = NEQ;
+			SYM = RIGHT_SHIFT;
 			GetCh();
 		}
 		else
@@ -660,12 +658,12 @@ void GetSym()
 			SYM = BIT_OR;
 		}
 	}
-	else if (CH == '^')
+	else if (CH == '^')//reserved for ^= support
 	{
 		GetCh();
 		SYM = BIT_XOR;
 	}
-	else if (CH == '~')
+	else if (CH == '~')//reserved for ~= support
 	{
 		GetCh();
 		SYM = BIT_NOT;
