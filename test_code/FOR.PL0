@@ -1,0 +1,19 @@
+PROGRAM EX04;
+VAR ISTART,ILAST,I,A;
+/* this is a line of comment */
+BEGIN
+ISTART := 1;
+ILAST  := 11;
+A := 1;
+FOR I := ISTART TO ILAST DO
+BEGIN
+A *= I;
+WRITE(A);
+END;
+FOR I := ILAST DOWNTO ISTART DO
+BEGIN
+A /= I;
+WRITE(A);
+END;
+
+END.

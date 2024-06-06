@@ -4,6 +4,7 @@
 #include <iostream>
 #include <array>
 #include <algorithm>
+#include <cstring>
 
 //---------------------------------------------------------------------------
 const int AL = 10;	   /* LENGTH OF IDENTIFIERS */
@@ -14,7 +15,13 @@ const int LEVMAX = 3;  /* MAX DEPTH OF BLOCK NESTING */
 const int CXMAX = 200; /* SIZE OF CODE ARRAY */
 
 
-
+struct ERR_CODE
+{
+	enum
+	{
+		MISSING_VAR_AFTER_FOR,
+	};
+};
 
 
 
@@ -38,6 +45,8 @@ typedef enum
 
 	MULTIEQ,
 	DIVIDEQ,
+	ADDEQ,
+	SUBEQ,
 	INCREMENT,
 	DECREMENT,
 	AND,
@@ -113,6 +122,8 @@ auto SYMBOL_INFO = [] {
 
 		{MULTIEQ, "*="},
 		{DIVIDEQ, "/="},
+		{ADDEQ, "+="},
+		{SUBEQ, "-="},
 		{INCREMENT, "++"},
 		{DECREMENT, "--"},
 		{AND, "&&"},
@@ -176,7 +187,7 @@ typedef enum
 	CAL,
 	INI,
 	JMP,
-	JPC
+	JPC,
 } FCT;
 typedef struct
 {
@@ -192,10 +203,98 @@ typedef struct
 /* INI 0 A -- INCREMET T-REGISTER BY A    */
 /* JMP 0 A -- JUMP TO A                   */
 /* JPC 0 A -- JUMP CONDITIONAL TO A       */
+
+struct OPR_CODE
+{
+	enum
+	{
+		RET,
+		NEG,
+		ADD,
+		SUB,
+		MUL,
+		DIV,
+		ODD,
+		MOD,
+		EQL,
+		NEQ,
+		LSS,
+		LEQ,
+		GTR,
+		GEQ,
+		WRT,
+		NEWLINE,
+		IN,
+		LSH,
+		RSH,
+		AND,
+		OR,
+		XOR,
+		NOT,
+	};
+};
+
+class symbol_reader
+{
+	std::array<SYMBOL, 4> m_buffer{};
+	uint8_t m_prev_read = 0;
+	uint8_t m_current = 0;
+	SYMBOL* m_current_symbol_debug = nullptr;
+
+	void next()
+	{
+		m_current++;
+		m_current %= m_buffer.size();
+		m_current_symbol_debug = &m_buffer[m_current];
+	}
+
+	void prev()
+	{
+		m_current--;
+		m_current %= m_buffer.size();
+		m_current_symbol_debug = &m_buffer[m_current];
+	}
+
+public:
+
+	SYMBOL operator=(SYMBOL sym)
+	{
+		next();
+		m_buffer[m_current] = sym;
+		return sym;
+	}
+
+	operator SYMBOL() const
+	{
+		return m_buffer[m_current];
+	}
+
+	void offset(int i)
+	{
+		m_current = (m_current + i) % m_buffer.size();
+		m_current_symbol_debug = &m_buffer[m_current];
+		m_prev_read -= i;
+	}
+
+	bool try_get_readed()
+	{
+		if (m_prev_read != 0)
+		{
+			m_prev_read--;
+			next();
+			return true;
+		}
+		return false;
+	}
+
+};
+
 char CH;	/*LAST CHAR READ*/
-SYMBOL SYM; /*LAST SYMBOL READ*/
+symbol_reader SYM; /*LAST SYMBOL READ*/
 ALFA ID;	/*LAST IDENTIFIER READ*/
 int NUM;	/*LAST NUMBER READ*/
+
+
 int CC;		/*CHARACTER COUNT*/
 int LL;		/*LINE LENGTH*/
 int CX;		/*CODE ALLOCATION INDEX*/
@@ -206,7 +305,7 @@ INSTRUCTION CODE[CXMAX];
 auto SSYM = [] {
 	std::array<SYMBOL, 128> bucket{};
 	for (int i = 0; i < MAX_SYMBOL; i++)
-		if(strlen(SYMBOL_INFO[i].str) == 1)
+		if (strlen(SYMBOL_INFO[i].str) == 1)
 			bucket[SYMBOL_INFO[i].str[0]] = SYMBOL_INFO[i].sym;
 	return bucket;
 	}();
@@ -248,7 +347,7 @@ auto WSYM = [] {
 	return arr;
 	}();
 
-const int NORW = WSYM.size()-1;
+const int NORW = WSYM.size() - 1;
 
 
 
@@ -348,84 +447,14 @@ SYMSET SymSetAdd(SYMBOL SY, SYMSET S)
 	return S1;
 }
 //---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a)
+template<typename... Args>
+SYMSET SymSetNew(Args... args)
 {
 	SYMSET S;
 	int i, k;
 	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	return S;
-}
-//---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a, SYMBOL b)
-{
-	SYMSET S;
-	int i, k;
-	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	S[b] = 1;
-	return S;
-}
-//---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c)
-{
-	SYMSET S;
-	int i, k;
-	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	S[b] = 1;
-	S[c] = 1;
-	return S;
-}
-//---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d)
-{
-	SYMSET S;
-	int i, k;
-	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	S[b] = 1;
-	S[c] = 1;
-	S[d] = 1;
-	return S;
-}
-//---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d, SYMBOL e)
-{
-	SYMSET S;
-	int i, k;
-	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	S[b] = 1;
-	S[c] = 1;
-	S[d] = 1;
-	S[e] = 1;
-	return S;
-}
-//---------------------------------------------------------------------------
-SYMSET SymSetNew(SYMBOL a, SYMBOL b, SYMBOL c, SYMBOL d, SYMBOL e, SYMBOL f)
-{
-	SYMSET S;
-	int i, k;
-	S = (SYMSET)std::malloc(sizeof(int) * MAX_SYMBOL);
-	for (i = 0; i < MAX_SYMBOL; i++)
-		S[i] = 0;
-	S[a] = 1;
-	S[b] = 1;
-	S[c] = 1;
-	S[d] = 1;
-	S[e] = 1;
-	S[f] = 1;
+	memset(S, 0, sizeof(int) * MAX_SYMBOL);
+	((S[args] = 1), ...);
 	return S;
 }
 //---------------------------------------------------------------------------
@@ -442,7 +471,7 @@ SYMSET SymSetNULL()
 void Error(int n)
 {
 	std::string s = "***" + std::string(CC - 1, ' ') + "^";
-	printf("%s\n", s.c_str());
+	printf("%s %d\n", s.c_str(), n);
 	fprintf(FOUT, "%s%d\n", s.c_str(), n);
 	ERR++;
 } /*Error*/
@@ -480,6 +509,7 @@ void GetCh()
 //---------------------------------------------------------------------------
 void GetSym()
 {
+	if (SYM.try_get_readed()) return;
 	int i, J, K;
 	ALFA A;
 	while (CH <= ' ')
@@ -601,10 +631,33 @@ void GetSym()
 			SYM = DIVIDEQ;
 			GetCh();
 		}
+		else if (CH == '*')
+		{
+			GetCh();
+			while (true)
+			{
+				if (CH == '*')
+				{
+					GetCh();
+					if (CH == '/')
+					{
+						GetCh();
+						break;
+					}
+				}
+				else
+				{
+					GetCh();
+				}
+			}
+			GetSym();
+		}
 		else
 		{
 			SYM = SLASH;
 		}
+
+
 	}
 	else if (CH == '+')
 	{
@@ -612,6 +665,11 @@ void GetSym()
 		if (CH == '+')
 		{
 			SYM = INCREMENT;
+			GetCh();
+		}
+		else if (CH == '=')
+		{
+			SYM = ADDEQ;
 			GetCh();
 		}
 		else
@@ -625,6 +683,11 @@ void GetSym()
 		if (CH == '-')
 		{
 			SYM = DECREMENT;
+			GetCh();
+		}
+		else if (CH == '=')
+		{
+			SYM = SUBEQ;
 			GetCh();
 		}
 		else
@@ -834,19 +897,52 @@ void FACTOR(SYMSET FSYS, int LEV, int& TX)
 	}
 } /*FACTOR*/
 //---------------------------------------------------------------------------
+int VariableFromId(int LEV, int TX)
+{
+	int i = POSITION(ID, TX);
+	if (i == 0)
+		Error(11);
+	else if (TABLE[i].KIND != VARIABLE)
+	{ /*ASSIGNMENT TO NON-VARIABLE*/
+		Error(12);
+		i = 0;
+	}
+	return i;
+}
+
+
 void TERM(SYMSET FSYS, int LEV, int& TX)
 { /*TERM*/
 	SYMBOL MULOP;
-	FACTOR(SymSetUnion(FSYS, SymSetNew(TIMES, SLASH)), LEV, TX);
-	while (SYM == TIMES || SYM == SLASH)
+	int i = 0;
+	FACTOR(SymSetUnion(FSYS, SymSetNew(TIMES, SLASH, MULTIEQ, DIVIDEQ)), LEV, TX);
+	while (SYM == TIMES || SYM == SLASH || SYM == MULTIEQ || SYM == DIVIDEQ)
 	{
+		if (SYM == MULTIEQ || SYM == DIVIDEQ)
+		{
+			i = VariableFromId(LEV, TX);
+			if (i == 0) continue;
+		}
 		MULOP = SYM;
 		GetSym();
 		FACTOR(SymSetUnion(FSYS, SymSetNew(TIMES, SLASH)), LEV, TX);
 		if (MULOP == TIMES)
-			GEN(OPR, 0, 4);
+			GEN(OPR, 0, OPR_CODE::MUL);
+		else if (MULOP == SLASH)
+			GEN(OPR, 0, OPR_CODE::DIV);
+		else if (MULOP == MULTIEQ)
+		{
+			GEN(OPR, 0, OPR_CODE::MUL);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+		}
+		else if (MULOP == DIVIDEQ)
+		{
+			GEN(OPR, 0, OPR_CODE::DIV);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+		}
 		else
-			GEN(OPR, 0, 5);
+			Error(24);
+
 	}
 } /*TERM*/;
 //---------------------------------------------------------------------------
@@ -859,19 +955,38 @@ void EXPRESSION(SYMSET FSYS, int LEV, int& TX)
 		GetSym();
 		TERM(SymSetUnion(FSYS, SymSetNew(PLUS, MINUS)), LEV, TX);
 		if (ADDOP == MINUS)
-			GEN(OPR, 0, 1);
+			GEN(OPR, 0, OPR_CODE::NEG);
 	}
 	else
 		TERM(SymSetUnion(FSYS, SymSetNew(PLUS, MINUS)), LEV, TX);
-	while (SYM == PLUS || SYM == MINUS)
+	while (SYM == PLUS || SYM == MINUS || SYM == ADDEQ || SYM == SUBEQ)
 	{
+		int i = 0;
+		if (SYM == ADDEQ || SYM == SUBEQ)
+		{
+			i = VariableFromId(LEV, TX);
+			if (i == 0) continue;
+		}
 		ADDOP = SYM;
 		GetSym();
 		TERM(SymSetUnion(FSYS, SymSetNew(PLUS, MINUS)), LEV, TX);
 		if (ADDOP == PLUS)
-			GEN(OPR, 0, 2);
+			GEN(OPR, 0, OPR_CODE::ADD);
+		else if (ADDOP == MINUS)
+			GEN(OPR, 0, OPR_CODE::SUB);
+		else if (ADDOP == ADDEQ)
+		{
+			GEN(OPR, 0, OPR_CODE::ADD);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+		}
+		else if (ADDOP == SUBEQ)
+		{
+			GEN(OPR, 0, OPR_CODE::SUB);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+		}
 		else
-			GEN(OPR, 0, 3);
+			Error(24);
+
 	}
 } /*EXPRESSION*/
 //---------------------------------------------------------------------------
@@ -882,7 +997,7 @@ void CONDITION(SYMSET FSYS, int LEV, int& TX)
 	{
 		GetSym();
 		EXPRESSION(FSYS, LEV, TX);
-		GEN(OPR, 0, 6);
+		GEN(OPR, 0, OPR_CODE::ODD);
 	}
 	else
 	{
@@ -897,22 +1012,22 @@ void CONDITION(SYMSET FSYS, int LEV, int& TX)
 			switch (RELOP)
 			{
 			case EQL:
-				GEN(OPR, 0, 8);
+				GEN(OPR, 0, OPR_CODE::EQL);
 				break;
 			case NEQ:
-				GEN(OPR, 0, 9);
+				GEN(OPR, 0, OPR_CODE::NEG);
 				break;
 			case LSS:
-				GEN(OPR, 0, 10);
+				GEN(OPR, 0, OPR_CODE::LSS);
 				break;
 			case GEQ:
-				GEN(OPR, 0, 11);
+				GEN(OPR, 0, OPR_CODE::GEQ);
 				break;
 			case GTR:
-				GEN(OPR, 0, 12);
+				GEN(OPR, 0, OPR_CODE::GTR);
 				break;
 			case LEQ:
-				GEN(OPR, 0, 13);
+				GEN(OPR, 0, OPR_CODE::LEQ);
 				break;
 			}
 		}
@@ -935,12 +1050,32 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 		}
 		GetSym();
 		if (SYM == BECOMES)
+		{
 			GetSym();
+			EXPRESSION(FSYS, LEV, TX);
+			if (i != 0)
+				GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+		}
+		else if (SYM == MULTIEQ || SYM == DIVIDEQ || SYM == INCREMENT || SYM == DECREMENT)
+		{
+			SYM.offset(-1);
+			EXPRESSION(FSYS, LEV, TX);
+		}
+		else if (SYM == INCREMENT || SYM == DECREMENT)
+		{
+			if (i != 0)
+			{
+				GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+				GEN(LIT, 0, 1);
+				GEN(OPR, 0, SYM == INCREMENT ? OPR_CODE::ADD : OPR_CODE::SUB);
+				GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+			}
+			else
+				Error(13);
+		}
 		else
 			Error(13);
-		EXPRESSION(FSYS, LEV, TX);
-		if (i != 0)
-			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+
 		break;
 	case READSYM:
 		GetSym();
@@ -958,14 +1093,14 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 					Error(35);
 				else
 				{
-					GEN(OPR, 0, 16);
+					GEN(OPR, 0, OPR_CODE::IN);
 					GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 				}
 				GetSym();
 			} while (SYM == COMMA);
 		if (SYM != RPAREN)
 		{
-			Error(MAX_SYMBOL);
+			Error(33);
 			while (!SymIn(SYM, FSYS))
 				GetSym();
 		}
@@ -980,14 +1115,14 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			{
 				GetSym();
 				EXPRESSION(SymSetUnion(SymSetNew(RPAREN, COMMA), FSYS), LEV, TX);
-				GEN(OPR, 0, 14);
+				GEN(OPR, 0, OPR_CODE::WRT);
 			} while (SYM == COMMA);
 			if (SYM != RPAREN)
-				Error(MAX_SYMBOL);
+				Error(33);
 			else
 				GetSym();
 		}
-		GEN(OPR, 0, 15);
+		GEN(OPR, 0, OPR_CODE::NEWLINE);
 		break; /*WRITESYM*/
 	case CALLSYM:
 		GetSym();
@@ -1058,6 +1193,58 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 		STATEMENT(FSYS, LEV, TX);
 		GEN(JMP, 0, CX1);
 		CODE[CX2].A = CX;
+		break;
+	case FORSYM:
+		GetSym();
+		if (SYM == IDENT)
+		{
+			i = POSITION(ID, TX);
+			if (i == 0)
+				Error(11);
+			else if (TABLE[i].KIND != VARIABLE)
+			{ /*ASSIGNMENT TO NON-VARIABLE*/
+				Error(12);
+				i = 0;
+			}
+			GetSym();
+			if (SYM == BECOMES)
+				GetSym();
+			else
+				Error(13);
+			EXPRESSION(SymSetAdd(DOWNTOSYM, SymSetAdd(TOSYM, FSYS)), LEV, TX);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+			bool inc = true;
+			if (SYM == TOSYM)
+			{
+				GetSym();
+			}
+			else if (SYM == DOWNTOSYM)
+			{
+				GetSym();
+				inc = false;
+			}
+			else
+				Error(19);
+			CX1 = CX;
+			EXPRESSION(SymSetAdd(DOSYM, FSYS), LEV, TX);
+			GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+			GEN(OPR, 0, inc ? OPR_CODE::GEQ : OPR_CODE::LEQ);
+			CX2 = CX;
+			GEN(JPC, 0, 0);
+			if (SYM == DOSYM)
+				GetSym();
+			else
+				Error(18);
+			STATEMENT(FSYS, LEV, TX);
+			GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+			GEN(LIT, 0, 2);// the course requires to increment by 2
+			GEN(OPR, 0, inc ? OPR_CODE::ADD : OPR_CODE::SUB);
+			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
+			GEN(JMP, 0, CX1);
+			CODE[CX2].A = CX;
+		}
+		else
+			Error(ERR_CODE::MISSING_VAR_AFTER_FOR);
 		break;
 	}
 	TEST(FSYS, SymSetNULL(), 19);
@@ -1162,9 +1349,9 @@ void Interpret()
 	int S[STACKSIZE]; /*DATASTORE*/
 	printf("~~~ RUN PL0 ~~~\n");
 	fprintf(FOUT, "~~~ RUN PL0 ~~~\n");
-	T = 0;
-	B = 1;
-	P = 0;
+	T = 0;// top of stack
+	B = 1;// base
+	P = 0;// instruction pointer
 	S[1] = 0;
 	S[2] = 0;
 	S[3] = 0;
@@ -1181,71 +1368,99 @@ void Interpret()
 		case OPR:
 			switch (I.A)
 			{		/*OPERATOR*/
-			case 0: /*RETURN*/
+			case OPR_CODE::RET: /*RETURN*/
 				T = B - 1;
 				P = S[T + 3];
 				B = S[T + 2];
 				break;
-			case 1:
+			case OPR_CODE::NEG:
 				S[T] = -S[T];
 				break;
-			case 2:
+			case OPR_CODE::ADD:
 				T--;
 				S[T] = S[T] + S[T + 1];
 				break;
-			case 3:
+			case OPR_CODE::SUB:
 				T--;
 				S[T] = S[T] - S[T + 1];
 				break;
-			case 4:
+			case OPR_CODE::MUL:
 				T--;
 				S[T] = S[T] * S[T + 1];
 				break;
-			case 5:
+			case OPR_CODE::DIV:
+				T--;
+				S[T] = S[T] / S[T + 1];
+				break;
+			case OPR_CODE::MOD:
 				T--;
 				S[T] = S[T] % S[T + 1];
 				break;
-			case 6:
+			case OPR_CODE::ODD:
 				S[T] = (S[T] % 2 != 0);
 				break;
-			case 8:
+			case OPR_CODE::EQL:
 				T--;
 				S[T] = S[T] == S[T + 1];
 				break;
-			case 9:
+			case OPR_CODE::NEQ:
 				T--;
 				S[T] = S[T] != S[T + 1];
 				break;
-			case 10:
+			case OPR_CODE::LSS:
 				T--;
 				S[T] = S[T] < S[T + 1];
 				break;
-			case 11:
+			case OPR_CODE::GEQ:
 				T--;
 				S[T] = S[T] >= S[T + 1];
 				break;
-			case 12:
+			case OPR_CODE::GTR:
 				T--;
 				S[T] = S[T] > S[T + 1];
 				break;
-			case 13:
+			case OPR_CODE::LEQ:
 				T--;
 				S[T] = S[T] <= S[T + 1];
 				break;
-			case 14:
-				printf("%d\n", S[T]);
-				fprintf(FOUT, "%d\n", S[T]);
+			case OPR_CODE::WRT:
+				printf("%d", S[T]);
+				fprintf(FOUT, "%d", S[T]);
 				T--;
 				break;
-			case 15: /*printf(""); fprintf(FOUT,"\n"); */
+			case OPR_CODE::NEWLINE:
+				printf("\n");
+				fprintf(FOUT, "\n");
 				break;
-			case 16:
+			case OPR_CODE::IN:
 				T++;
 				std::cout << "请输入一个整数：";
 				std::cin >> S[T];
 				printf("? %d\n", S[T]);
 				fprintf(FOUT, "? %d\n", S[T]);
 				break;
+			case OPR_CODE::LSH:
+				T--;
+				S[T] = S[T] << S[T + 1];
+				break;
+			case OPR_CODE::RSH:
+				T--;
+				S[T] = S[T] >> S[T + 1];
+				break;
+			case OPR_CODE::AND:
+				T--;
+				S[T] = S[T] & S[T + 1];
+				break;
+			case OPR_CODE::OR:
+				T--;
+				S[T] = S[T] | S[T + 1];
+				break;
+			case OPR_CODE::XOR:
+				T--;
+				S[T] = S[T] ^ S[T + 1];
+				break;
+			case OPR_CODE::NOT:
+				S[T] = ~S[T];
 			}
 			break;
 		case LOD:
