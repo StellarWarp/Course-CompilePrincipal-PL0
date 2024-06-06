@@ -17,8 +17,39 @@ const int CXMAX = 200; /* SIZE OF CODE ARRAY */
 
 struct ERR_CODE
 {
-	enum
+	enum CODE
 	{
+		NORMAL = 0,
+		UNEXPECTED_BECOMES_TO_CONST = 1,
+		EXPECT_NUMBER_FOR_CONST = 2,
+		EXPECT_IDENTIFIER_FOR_DECLARATION = 4,
+		EXPECT_SEMICOLON_AFTER_DECLARATION = 5,
+
+		UNEXPECTED_SYMBOL_IN_BLOCK = 8,
+		EXPECT_PERIOD = 9,
+		EXPECT_SEMICOLON = 10,
+		EXPECT_IDENTIFIER = 11,
+		ASSIGNMENT_TO_NON_VARIABLE = 12,
+		EXPECT_BECOMES = 13,
+		EXPECT_IDENTIFIER_FOR_CALL = 14,
+		EXPECT_PROCEDURE_IDENTIFIER = 15,
+		EXPECT_THEN = 16,
+		EXPECT_END = 17,
+		EXPECT_DO = 18,
+		EXPECT_TO_OR_DOWNTO = 19,
+		UNEXPECTED_SYMBOL_IN_CONDITION = 20,
+		UNEXPECTED_PROCEDURE_IDENTIFIER = 21,
+		EXPECT_RIGHT_PAREN_FOR_EXPRESSION = 22,
+		UNEXPECTED_SYMBOL_IN_FACTOR = 23,
+		EXPECT_OPERATOR = 24,
+		MISSING_OPERATOR_IN_STATEMENT = 25,
+
+		NUMBER_TOO_LARGE = 30,
+		NUMBER_READ_EXCEEDS_MAX = 31,
+		MAX_BLOCK_DEPTH_EXCEEDED = 32,
+		EXPECT_RIGHT_PAREN = 33,
+		EXPECT_LEFT_PAREN = 34,
+		EXPECT_IDENTIFIER_FOR_READ = 35,
 		MISSING_VAR_AFTER_FOR,
 	};
 };
@@ -76,9 +107,9 @@ typedef enum
 	DOSYM,
 	CALLSYM,
 	CONSTSYM,
-	VARSYM,
 	PROCSYM,
 	PROGSYM,
+	VARSYM,
 
 	ELSESYM,
 	FORSYM,
@@ -146,9 +177,9 @@ auto SYMBOL_INFO = [] {
 		{DOSYM, "DO"},
 		{CALLSYM, "CALL"},
 		{CONSTSYM, "CONST"},
-		{VARSYM, "VAR"},
 		{PROCSYM, "PROCEDURE"},
 		{PROGSYM, "PROGRAM"},
+		{VARSYM, "VAR"},
 
 
 		{ELSESYM, "ELSE"},
@@ -556,7 +587,7 @@ void GetSym()
 			GetCh();
 		} while (CH >= '0' && CH <= '9');
 		if (K > NMAX)
-			Error(30);
+			Error(ERR_CODE::NUMBER_TOO_LARGE);
 	}
 	else if (CH == ':')
 	{
@@ -773,7 +804,7 @@ void ENTER(OBJECTS K, int LEV, int& TX, int& DX)
 	case CONSTANT:
 		if (NUM > AMAX)
 		{
-			Error(31);
+			Error(ERR_CODE::NUMBER_READ_EXCEEDS_MAX);
 			NUM = 0;
 		}
 		TABLE[TX].VAL = NUM;
@@ -806,7 +837,7 @@ void ConstDeclaration(int LEV, int& TX, int& DX)
 		if (SYM == EQL || SYM == BECOMES)
 		{
 			if (SYM == BECOMES)
-				Error(1);
+				Error(ERR_CODE::UNEXPECTED_BECOMES_TO_CONST);
 			GetSym();
 			if (SYM == NUMBER)
 			{
@@ -814,13 +845,13 @@ void ConstDeclaration(int LEV, int& TX, int& DX)
 				GetSym();
 			}
 			else
-				Error(2);
+				Error(ERR_CODE::EXPECT_NUMBER_FOR_CONST);
 		}
 		else
 			Error(3);
 	}
 	else
-		Error(4);
+		Error(ERR_CODE::EXPECT_IDENTIFIER_FOR_DECLARATION);
 } /*ConstDeclaration()*/
 //---------------------------------------------------------------------------
 void VarDeclaration(int LEV, int& TX, int& DX)
@@ -831,7 +862,7 @@ void VarDeclaration(int LEV, int& TX, int& DX)
 		GetSym();
 	}
 	else
-		Error(4);
+		Error(ERR_CODE::EXPECT_IDENTIFIER_FOR_DECLARATION);
 } /*VarDeclaration()*/
 //---------------------------------------------------------------------------
 void ListCode(int CX0)
@@ -858,7 +889,7 @@ void FACTOR(SYMSET FSYS, int LEV, int& TX)
 		{
 			i = POSITION(ID, TX);
 			if (i == 0)
-				Error(11);
+				Error(ERR_CODE::EXPECT_IDENTIFIER);
 			else
 				switch (TABLE[i].KIND)
 				{
@@ -869,7 +900,7 @@ void FACTOR(SYMSET FSYS, int LEV, int& TX)
 					GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 					break;
 				case PROCEDUR:
-					Error(21);
+					Error(ERR_CODE::UNEXPECTED_PROCEDURE_IDENTIFIER);
 					break;
 				}
 			GetSym();
@@ -878,7 +909,7 @@ void FACTOR(SYMSET FSYS, int LEV, int& TX)
 		{
 			if (NUM > AMAX)
 			{
-				Error(31);
+				Error(ERR_CODE::NUMBER_READ_EXCEEDS_MAX);
 				NUM = 0;
 			}
 			GEN(LIT, 0, NUM);
@@ -891,9 +922,9 @@ void FACTOR(SYMSET FSYS, int LEV, int& TX)
 			if (SYM == RPAREN)
 				GetSym();
 			else
-				Error(22);
+				Error(ERR_CODE::EXPECT_RIGHT_PAREN_FOR_EXPRESSION);
 		}
-		TEST(FSYS, FACBEGSYS, 23);
+		TEST(FSYS, FACBEGSYS, ERR_CODE::UNEXPECTED_SYMBOL_IN_FACTOR);
 	}
 } /*FACTOR*/
 //---------------------------------------------------------------------------
@@ -901,10 +932,10 @@ int VariableFromId(int LEV, int TX)
 {
 	int i = POSITION(ID, TX);
 	if (i == 0)
-		Error(11);
+		Error(ERR_CODE::EXPECT_IDENTIFIER);
 	else if (TABLE[i].KIND != VARIABLE)
 	{ /*ASSIGNMENT TO NON-VARIABLE*/
-		Error(12);
+		Error(ERR_CODE::ASSIGNMENT_TO_NON_VARIABLE);
 		i = 0;
 	}
 	return i;
@@ -941,7 +972,7 @@ void TERM(SYMSET FSYS, int LEV, int& TX)
 			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 		}
 		else
-			Error(24);
+			Error(ERR_CODE::EXPECT_OPERATOR);
 
 	}
 } /*TERM*/;
@@ -985,7 +1016,7 @@ void EXPRESSION(SYMSET FSYS, int LEV, int& TX)
 			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 		}
 		else
-			Error(24);
+			Error(ERR_CODE::EXPECT_OPERATOR);
 
 	}
 } /*EXPRESSION*/
@@ -1003,7 +1034,7 @@ void CONDITION(SYMSET FSYS, int LEV, int& TX)
 	{
 		EXPRESSION(SymSetUnion(SymSetNew(EQL, NEQ, LSS, LEQ, GTR, GEQ), FSYS), LEV, TX);
 		if (!SymIn(SYM, SymSetNew(EQL, NEQ, LSS, LEQ, GTR, GEQ)))
-			Error(20);
+			Error(ERR_CODE::UNEXPECTED_SYMBOL_IN_CONDITION);
 		else
 		{
 			RELOP = SYM;
@@ -1042,10 +1073,10 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 	case IDENT:
 		i = POSITION(ID, TX);
 		if (i == 0)
-			Error(11);
+			Error(ERR_CODE::EXPECT_IDENTIFIER);
 		else if (TABLE[i].KIND != VARIABLE)
 		{ /*ASSIGNMENT TO NON-VARIABLE*/
-			Error(12);
+			Error(ERR_CODE::ASSIGNMENT_TO_NON_VARIABLE);
 			i = 0;
 		}
 		GetSym();
@@ -1070,17 +1101,15 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 				GEN(OPR, 0, SYM == INCREMENT ? OPR_CODE::ADD : OPR_CODE::SUB);
 				GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 			}
-			else
-				Error(13);
 		}
 		else
-			Error(13);
+			Error(ERR_CODE::MISSING_OPERATOR_IN_STATEMENT);
 
 		break;
 	case READSYM:
 		GetSym();
 		if (SYM != LPAREN)
-			Error(34);
+			Error(ERR_CODE::EXPECT_LEFT_PAREN);
 		else
 			do
 			{
@@ -1090,7 +1119,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 				else
 					i = 0;
 				if (i == 0)
-					Error(35);
+					Error(ERR_CODE::EXPECT_IDENTIFIER_FOR_READ);
 				else
 				{
 					GEN(OPR, 0, OPR_CODE::IN);
@@ -1100,7 +1129,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			} while (SYM == COMMA);
 		if (SYM != RPAREN)
 		{
-			Error(33);
+			Error(ERR_CODE::EXPECT_RIGHT_PAREN);
 			while (!SymIn(SYM, FSYS))
 				GetSym();
 		}
@@ -1118,7 +1147,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 				GEN(OPR, 0, OPR_CODE::WRT);
 			} while (SYM == COMMA);
 			if (SYM != RPAREN)
-				Error(33);
+				Error(ERR_CODE::EXPECT_RIGHT_PAREN);
 			else
 				GetSym();
 		}
@@ -1127,16 +1156,16 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 	case CALLSYM:
 		GetSym();
 		if (SYM != IDENT)
-			Error(14);
+			Error(ERR_CODE::EXPECT_IDENTIFIER_FOR_CALL);
 		else
 		{
 			i = POSITION(ID, TX);
 			if (i == 0)
-				Error(11);
+				Error(ERR_CODE::EXPECT_IDENTIFIER);
 			else if (TABLE[i].KIND == PROCEDUR)
 				GEN(CAL, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 			else
-				Error(15);
+				Error(ERR_CODE::EXPECT_PROCEDURE_IDENTIFIER);
 			GetSym();
 		}
 		break;
@@ -1146,7 +1175,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 		if (SYM == THENSYM)
 			GetSym();
 		else
-			Error(16);
+			Error(ERR_CODE::EXPECT_THEN);
 		CX1 = CX;
 		GEN(JPC, 0, 0);
 		STATEMENT(SymSetUnion(SymSetNew(ELSESYM, DOSYM), FSYS), LEV, TX);
@@ -1172,13 +1201,13 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			if (SYM == SEMICOLON)
 				GetSym();
 			else
-				Error(10);
+				Error(ERR_CODE::EXPECT_SEMICOLON);
 			STATEMENT(SymSetUnion(SymSetNew(SEMICOLON, ENDSYM), FSYS), LEV, TX);
 		}
 		if (SYM == ENDSYM)
 			GetSym();
 		else
-			Error(17);
+			Error(ERR_CODE::EXPECT_END);
 		break;
 	case WHILESYM:
 		CX1 = CX;
@@ -1189,7 +1218,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 		if (SYM == DOSYM)
 			GetSym();
 		else
-			Error(18);
+			Error(ERR_CODE::EXPECT_DO);
 		STATEMENT(FSYS, LEV, TX);
 		GEN(JMP, 0, CX1);
 		CODE[CX2].A = CX;
@@ -1200,17 +1229,17 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 		{
 			i = POSITION(ID, TX);
 			if (i == 0)
-				Error(11);
+				Error(ERR_CODE::EXPECT_IDENTIFIER);
 			else if (TABLE[i].KIND != VARIABLE)
 			{ /*ASSIGNMENT TO NON-VARIABLE*/
-				Error(12);
+				Error(ERR_CODE::ASSIGNMENT_TO_NON_VARIABLE);
 				i = 0;
 			}
 			GetSym();
 			if (SYM == BECOMES)
 				GetSym();
 			else
-				Error(13);
+				Error(ERR_CODE::EXPECT_BECOMES);
 			EXPRESSION(SymSetAdd(DOWNTOSYM, SymSetAdd(TOSYM, FSYS)), LEV, TX);
 			GEN(STO, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 			bool inc = true;
@@ -1224,7 +1253,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 				inc = false;
 			}
 			else
-				Error(19);
+				Error(ERR_CODE::EXPECT_TO_OR_DOWNTO);
 			CX1 = CX;
 			EXPRESSION(SymSetAdd(DOSYM, FSYS), LEV, TX);
 			GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
@@ -1234,7 +1263,7 @@ void STATEMENT(SYMSET FSYS, int LEV, int& TX)
 			if (SYM == DOSYM)
 				GetSym();
 			else
-				Error(18);
+				Error(ERR_CODE::EXPECT_DO);
 			STATEMENT(FSYS, LEV, TX);
 			GEN(LOD, LEV - TABLE[i].vp.LEVEL, TABLE[i].vp.ADR);
 			GEN(LIT, 0, 2);// the course requires to increment by 2
@@ -1258,7 +1287,7 @@ void Block(int LEV, int TX, SYMSET FSYS)
 	TABLE[TX].vp.ADR = CX;
 	GEN(JMP, 0, 0);
 	if (LEV > LEVMAX)
-		Error(32);
+		Error(ERR_CODE::MAX_BLOCK_DEPTH_EXCEEDED);
 	do
 	{
 		if (SYM == CONSTSYM)
@@ -1275,7 +1304,7 @@ void Block(int LEV, int TX, SYMSET FSYS)
 				if (SYM == SEMICOLON)
 					GetSym();
 				else
-					Error(5);
+					Error(ERR_CODE::EXPECT_SEMICOLON_AFTER_DECLARATION);
 			} while (SYM == IDENT);
 		}
 		if (SYM == VARSYM)
@@ -1292,7 +1321,7 @@ void Block(int LEV, int TX, SYMSET FSYS)
 				if (SYM == SEMICOLON)
 					GetSym();
 				else
-					Error(5);
+					Error(ERR_CODE::EXPECT_SEMICOLON_AFTER_DECLARATION);
 			} while (SYM == IDENT);
 		}
 		while (SYM == PROCSYM)
@@ -1304,11 +1333,11 @@ void Block(int LEV, int TX, SYMSET FSYS)
 				GetSym();
 			}
 			else
-				Error(4);
+				Error(ERR_CODE::EXPECT_IDENTIFIER_FOR_DECLARATION);
 			if (SYM == SEMICOLON)
 				GetSym();
 			else
-				Error(5);
+				Error(ERR_CODE::EXPECT_SEMICOLON_AFTER_DECLARATION);
 			Block(LEV + 1, TX, SymSetAdd(SEMICOLON, FSYS));
 			if (SYM == SEMICOLON)
 			{
@@ -1316,7 +1345,7 @@ void Block(int LEV, int TX, SYMSET FSYS)
 				TEST(SymSetUnion(SymSetNew(IDENT, PROCSYM), STATBEGSYS), FSYS, 6);
 			}
 			else
-				Error(5);
+				Error(ERR_CODE::EXPECT_SEMICOLON_AFTER_DECLARATION);
 		}
 		TEST(SymSetAdd(IDENT, STATBEGSYS), DECLBEGSYS, 7);
 	} while (SymIn(SYM, DECLBEGSYS));
@@ -1326,7 +1355,7 @@ void Block(int LEV, int TX, SYMSET FSYS)
 	GEN(INI, 0, DX);
 	STATEMENT(SymSetUnion(SymSetNew(SEMICOLON, ENDSYM), FSYS), LEV, TX);
 	GEN(OPR, 0, 0); /*RETURN*/
-	TEST(FSYS, SymSetNULL(), 8);
+	TEST(FSYS, SymSetNULL(), ERR_CODE::UNEXPECTED_SYMBOL_IN_BLOCK);
 	ListCode(CX0);
 } /*Block*/
 //---------------------------------------------------------------------------
@@ -1524,14 +1553,14 @@ void ButtonRunClick()
 			{
 				GetSym();
 				if (SYM != SEMICOLON)
-					Error(5);
+					Error(ERR_CODE::EXPECT_SEMICOLON);
 				else
 					GetSym();
 			}
 		}
 		Block(0, 0, SymSetAdd(PERIOD, SymSetUnion(DECLBEGSYS, STATBEGSYS)));
 		if (SYM != PERIOD)
-			Error(9);
+			Error(ERR_CODE::EXPECT_PERIOD);
 		if (ERR == 0)
 			Interpret();
 		else
